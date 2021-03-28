@@ -1,7 +1,10 @@
-name: PAndroid
+name: jphp-PAndroid
 version: 1.0.0
 description: JPPM Plugin for PAndroid
 type: plugin
+
+plugins:
+  - Hub
 
 plugin:
   list:

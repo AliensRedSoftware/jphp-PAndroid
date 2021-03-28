@@ -16,7 +16,7 @@ use compress\ZipArchive;
 use compress\ZipArchiveEntry;
 
 /**
- * Class AndroidPlugin
+ * Class PAndroid
  *
  * @jppm-task init as android:init
  * @jppm-task compile as android:compile
@@ -25,7 +25,7 @@ use compress\ZipArchiveEntry;
  *
  * @jppm-task compile as build
  */
-class AndroidPlugin {
+class PAndroid {
      // paths
     public const JPHP_COMPILER_PATH = "./.jpfa/compiler.jar";
     public const JPHP_COMPILER_RESOURCE = "res://jpfa/jphp-compiler.jar";
@@ -100,7 +100,7 @@ class AndroidPlugin {
         $yaml = fs::parseAs("./" . Package::FILENAME, "yaml");
 
         $classPath .= File::PATH_SEPARATOR . $_ENV["ANDROID_HOME"] . "/platforms/android-" . $yaml["android"]["sdk"] . "/android.jar";
-        echo $classPath;
+        /*
         $process = new Process([
             'java', '-cp', $classPath,
             AndroidPlugin::JPHP_COMPILER_MAIN_CLASS,
@@ -109,7 +109,7 @@ class AndroidPlugin {
         ], './');
 
         $exit = $process->inheritIO()->startAndWait()->getExitValue();
-
+        */
         if ($exit != 0) {
             Console::log("[ERROR] Error compiling jPHP");
             exit($exit);
