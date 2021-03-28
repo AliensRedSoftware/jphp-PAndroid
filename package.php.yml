@@ -1,0 +1,27 @@
+name: PAndroid
+version: 1.0.0
+description: JPPM Plugin for PAndroid
+type: plugin
+
+plugin:
+  list:
+    - Android
+  sources:
+    - src
+
+deps:
+  jphp-compress-ext: '*'
+  jphp-runtime: '*'
+
+config:
+  ignore:
+    - /sandbox/**
+    - /.idea/**
+    - /.gradle/**
+    - /*.iml
+    - /.git/**
+    - /examples/**
+    - /gradle/**
+    - /jars/**
+    - /build/**
+    - /package.hub.yml
