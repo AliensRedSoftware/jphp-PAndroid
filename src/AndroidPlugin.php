@@ -15,8 +15,9 @@ use php\lib\str;
 use compress\ZipArchive;
 use compress\ZipArchiveEntry;
 
+
 /**
- * Class PAndroid
+ * Class AndroidPlugin
  *
  * @jppm-task init as android:init
  * @jppm-task compile as android:compile
@@ -25,7 +26,7 @@ use compress\ZipArchiveEntry;
  *
  * @jppm-task compile as build
  */
-class PAndroid {
+class AndroidPlugin {
      // paths
     public const JPHP_COMPILER_PATH = "./.jpfa/compiler.jar";
     public const JPHP_COMPILER_RESOURCE = "res://jpfa/jphp-compiler.jar";
@@ -42,8 +43,8 @@ class PAndroid {
     public const GRADLEW_WIN_RESOURCE = "res://gradle/gradlew.bat";
     public const ANDROID_JAVAFX_RESOURCES = "res://javafx-android-res.zip";
     public const ANDROID_NATIVE_RESOURCES = "res://native-android-res.zip";
-    
-    public const JPHP_COMPILER_MAIN_CLASS = "php.runtime.launcher.Launcher";
+    //main class start...
+    public const MC = "php.runtime.launcher.Launcher";
 
     /**
      * Init android project
@@ -68,53 +69,37 @@ class PAndroid {
      * @throws \php\format\ProcessorException
      */
     public function exec_gradle_task(Event $event, string $task) {
-        $this->check_environment();
-        $this->gradle_init();
-        $this->prepare_compiler();
-        $this->generate_gradle_build($event);
-
-        Tasks::run("app:build", [], null);
-
-        $buildFileName = "{$event->package()->getName()}-{$event->package()->getVersion('last')}";
-        Console::log('-> unpack jar');
-        fs::makeDir('./build/out');
-
-        $zip = new ZipArchive(fs::abs('./build/' . $buildFileName . '.jar'));
-        $zip->readAll(function (ZipArchiveEntry $entry, ?Stream $stream) {
-            if (!$entry->isDirectory()) {
-                fs::makeFile(fs::abs('./build/out/' . $entry->name));
-                fs::copy($stream, fs::abs('./build/out/' . $entry->name));
-            } else fs::makeDir(fs::abs('./build/out/' . $entry->name));
-        });
-        echo "  -> done\n";
-
+        //SETTINGS COMPILE
+        $this->CheckEnvironment();//Проверка переменной
+        $this->GInit();//Инициализация gradle
+        $this->JPFAC($event);//Компиляция JPFAC...
+        $this->GGBuild($event);
+        Tasks::run('app:build',[],null);
+        $this->JPFA($event);
         Console::log('-> starting compiler ...');
-
-        $classPath = fs::parseAs("./vendor/paths.json", "json")["classPaths"][""];
-        foreach ($classPath as $key => $path){
-            $classPath[$key] = fs::normalize(fs::abs("./vendor/") . $path);
+        foreach(fs::parseAs('./vendor/paths.json','json')['classPaths'][""] as $key=>$path){
+            $classPath[$key]=fs::normalize(fs::abs('./vendor/').$path);
         }
-
-        $classPath = str::join($classPath, File::PATH_SEPARATOR) . File::PATH_SEPARATOR . AndroidPlugin::JPHP_COMPILER_PATH;
-
-        $yaml = fs::parseAs("./" . Package::FILENAME, "yaml");
-
-        $classPath .= File::PATH_SEPARATOR . $_ENV["ANDROID_HOME"] . "/platforms/android-" . $yaml["android"]["sdk"] . "/android.jar";
-        /*
+        $classPath=str::join($classPath,File::PATH_SEPARATOR);
+        $buildFileName="{$event->package()->getName()}-{$event->package()->getVersion('last')}";
+        $execute=fs::normalize(fs::abs('./build/').fs::separator()."$buildFileName.jar").File::PATH_SEPARATOR.$classPath;
+        $yaml=fs::parseAs('./'.Package::FILENAME,'yaml');
+        $path=$this->CheckEnvironment($_ENV['SDK'].fs::separator().'platforms'.fs::separator().'android-'.$yaml['android']['sdk'].fs::separator().'android.jar');//Проверка пути sdk
+        //compile main class...
+        Console::log('-> search "'.self::MC.'" process compiler  ...');
         $process = new Process([
-            'java', '-cp', $classPath,
-            AndroidPlugin::JPHP_COMPILER_MAIN_CLASS,
+            'java', '-cp', "{$execute}{$classPath}",
+            self::MC,
             '--src', './build/out',
             '--dest', './libs/compile.jar'
         ], './');
-
-        $exit = $process->inheritIO()->startAndWait()->getExitValue();
-        */
-        if ($exit != 0) {
-            Console::log("[ERROR] Error compiling jPHP");
-            exit($exit);
-        } else Console::log(" -> done");
-
+        $exit=$process->inheritIO()->startAndWait()->getExitValue();
+        if($exit!=0){
+            Console::error('-> search "'.self::MC.'" process');
+            die($exit);
+        }else{
+            Console::log(' -> success search "'.self::MC.'" process :)');
+        }
         Console::log('-> starting gradle ...');
 
         /** @var Process $process */
@@ -189,52 +174,89 @@ class PAndroid {
 
         exit(0);
     }
-
-    protected function prepare_compiler() {
-        if (!fs::exists(AndroidPlugin::JPHP_COMPILER_PATH)) {
-            Console::log("-> prepare jPHP compiler ...");
-
-            fs::makeDir("./.jpfa/");
-            Tasks::createFile(AndroidPlugin::JPHP_COMPILER_PATH,
-                fs::get(AndroidPlugin::JPHP_COMPILER_RESOURCE));
+    /**
+     * Компиляция jPFA (Кэши)
+     */
+    protected function JPFAC($event) {
+        if(!fs::exists(self::JPHP_COMPILER_PATH)){
+            Console::log('-> prepare jPFAС compiler ...');
+            fs::makeDir('./.jpfa/');
+            Tasks::createFile(self::JPHP_COMPILER_PATH,fs::get(self::JPHP_COMPILER_RESOURCE));
+            Console::log('-> success jPFAС compiler :)');
         }
     }
-
-    protected function check_environment() {
-        if (!$_ENV["ANDROID_HOME"]) {
-            Console::error("Environment variable ANDROID_HOME is not set");
-            exit(101);
+    /**
+     * Компиляция jPFA
+     */
+    protected function JPFA($event) {
+        if(fs::exists(self::JPHP_COMPILER_PATH)){
+            Console::log('-> prepare jPFA compiler ...');
+            $buildFileName="{$event->package()->getName()}-{$event->package()->getVersion('last')}";
+            Console::log('-> unpack jar');
+            fs::makeDir('./build/out');
+            $zip = new ZipArchive(fs::abs('./build/' . $buildFileName . '.jar'));
+            $zip->readAll(function (ZipArchiveEntry $entry, ?Stream $stream) {
+                if(!$entry->isDirectory()){
+                    fs::makeFile(fs::abs('./build/out/' . $entry->name));
+                    fs::copy($stream, fs::abs('./build/out/' . $entry->name));
+                }else{
+                    fs::makeDir(fs::abs('./build/out/' . $entry->name));
+                }
+            });
+            Console::log('-> success jPFA compiler :)');
         }
     }
-
-    protected function gradle_init() {
+    /**
+     * Чек переменной
+     * path-Путь
+     */
+    protected function CheckEnvironment($path=false){
+        if(!$path){
+            if(!$_ENV['SDK']||!is_dir($_ENV['SDK'])){
+                Console::error('Environment variable SDK is not set');
+                exit(101);
+            }
+            Console::log('-> [success] Environment variable SDK :)');
+        }else{
+            if(!$path||!is_file($path)){
+                Console::error('Environment variable SDK-path is not valid android.jar');
+                exit(101);
+            }
+            Console::log('-> [success] Environment variable SDK-path :)');
+            return $path;
+        }
+        return true;
+    }
+    /**
+     * Инициализация gradle
+     */
+    protected function GInit() {
         Console::log('-> install gradle ...');
+        Tasks::createDir(self::GRADLE_WRAPPER_DIR);
+        Tasks::createFile(self::GRADLEW_UNIX_FILE,
+            str::replace(fs::get(self::GRADLEW_UNIX_RESOURCE), "\r\n", "\n"));
+        Tasks::createFile(self::GRADLEW_WIN_FILE,
+            fs::get(self::GRADLEW_WIN_RESOURCE));
 
-        Tasks::createDir(AndroidPlugin::GRADLE_WRAPPER_DIR);
-        Tasks::createFile(AndroidPlugin::GRADLEW_UNIX_FILE,
-            str::replace(fs::get(AndroidPlugin::GRADLEW_UNIX_RESOURCE), "\r\n", "\n"));
-        Tasks::createFile(AndroidPlugin::GRADLEW_WIN_FILE,
-            fs::get(AndroidPlugin::GRADLEW_WIN_RESOURCE));
-
-        (new File(AndroidPlugin::GRADLEW_UNIX_FILE))
+        (new File(self::GRADLEW_UNIX_FILE))
             ->setExecutable(true);
-
-        fs::copy(AndroidPlugin::GRADLE_WRAPPER_JAR_RESOURCE, AndroidPlugin::GRADLE_WRAPPER_JAR_FILE);
-        fs::copy(AndroidPlugin::GRADLE_WRAPPER_PROP_RESOURCE, AndroidPlugin::GRADLE_WRAPPER_PROP_FILE);
+        fs::copy(self::GRADLE_WRAPPER_JAR_RESOURCE, self::GRADLE_WRAPPER_JAR_FILE);
+        fs::copy(self::GRADLE_WRAPPER_PROP_RESOURCE, self::GRADLE_WRAPPER_PROP_FILE);
     }
 
-    protected function generate_gradle_build(Event $event) {
+    protected function GGBuild(Event $event) {
         Console::log('-> prepare build.gradle ...');
 
         Tasks::createFile("./build.gradle");
         $template = Stream::getContents($event->package()->getAny('android.ui', "javafx") == "javafx" ?
-            AndroidPlugin::JPHP_BUILD_TEMPLATE_JAVAFX : AndroidPlugin::JPHP_BUILD_TEMPLATE_NATIVE);
+            self::JPHP_BUILD_TEMPLATE_JAVAFX : self::JPHP_BUILD_TEMPLATE_NATIVE);
 
         $config = $event->package()->getAny('android', []);
-        $config["sdk-path"] = str::replace($_ENV["ANDROID_HOME"], "\\", "\\\\");
+        $config["sdk-path"] = str::replace($_ENV['SDK'], "\\", "\\\\");
 
-        foreach ($config as $key => $value)
+        foreach ($config as $key => $value){
             $template = str::replace($template, "%$key%", $value);
+        }
 
         Stream::putContents("./build.gradle", $template);
     }
